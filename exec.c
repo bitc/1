@@ -7,19 +7,77 @@
 #include "x86.h"
 #include "elf.h"
 
+#define MAX_PATH_ENTRIES 10
+#define INPUT_BUF 128 // This is the same value from console.c
+struct {
+  char entries[MAX_PATH_ENTRIES][INPUT_BUF];
+  uint size; // Initialized by compiler to default value of 0
+} kernel_path;
+
+int
+sys_add_path(void)
+{
+  char *path;
+  int l;
+
+  // Initialize function argument
+  if(argstr(0, &path) < 0)
+    return -1;
+
+  // Check to make sure that there is still room in PATH
+  if(kernel_path.size == MAX_PATH_ENTRIES)
+    return -1;
+
+  safestrcpy(kernel_path.entries[kernel_path.size], path, INPUT_BUF);
+
+  // Append trailing '/' character if necessary
+  l = strlen(path);
+  if(path[l-1] != '/' && l < INPUT_BUF - 1) {
+    kernel_path.entries[kernel_path.size][l] = '/';
+    kernel_path.entries[kernel_path.size][l+1] = '\0';
+  }
+
+  kernel_path.size++;
+
+  return 0;
+}
+
 int
 exec(char *path, char **argv)
 {
+  char full_path[INPUT_BUF];
   char *s, *last;
-  int i, off;
+  int i, l, off;
   uint argc, sz, sp, ustack[3+MAXARG+1];
   struct elfhdr elf;
   struct inode *ip;
   struct proghdr ph;
   pde_t *pgdir, *oldpgdir;
 
-  if((ip = namei(path)) == 0)
-    return -1;
+  if((ip = namei(path)) == 0) {
+    // Executable not found in current directory. Try searching for it in
+    // kernel_path (PATH)
+
+    for(i=0; i<kernel_path.size; ++i) {
+      // We need to make a string that is the concatenation of both:
+      // kernel_path.entries[i] + path
+
+      l = strlen(kernel_path.entries[i]);
+      safestrcpy(full_path, kernel_path.entries[i], INPUT_BUF);
+      safestrcpy(full_path + l, path, INPUT_BUF - l);
+
+      ip = namei(full_path);
+
+      if (ip != 0) {
+        path = full_path;
+        break;
+      }
+    }
+    if(i == kernel_path.size) {
+      // Executable was not found anywhere
+      return -1;
+    }
+  }
   ilock(ip);
   pgdir = 0;
 

@@ -8,6 +8,7 @@
     int $T_SYSCALL; \
     ret
 
+SYSCALL(add_path)
 SYSCALL(fork)
 SYSCALL(exit)
 SYSCALL(wait)

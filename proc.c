@@ -70,6 +70,11 @@ found:
   memset(p->context, 0, sizeof *p->context);
   p->context->eip = (uint)forkret;
 
+  p->ctime = ticks; // TODO Might need to protect the read of ticks with a lock
+  p->etime = 0;
+  p->iotime = 0;
+  p->rtime = 0;
+
   return p;
 }
 
@@ -199,6 +204,7 @@ exit(void)
 
   // Jump into the scheduler, never to return.
   proc->state = ZOMBIE;
+  proc->etime = ticks; // TODO Might need to protect the read of ticks with a lock
   sched();
   panic("zombie exit");
 }

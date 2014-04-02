@@ -202,7 +202,16 @@ struct {
   int o; // Insert offset
 } input;
 
+#define MAX_HISTORY_LENGTH 20
+struct {
+  char buf[MAX_HISTORY_LENGTH][INPUT_BUF];
+  int selected;
+  int next;
+} input_history;
+
 #define C(x)  ((x)-'@')  // Control-x
+#define KEY_UP 226
+#define KEY_DOWN 227
 #define KEY_LEFT 228
 #define KEY_RIGHT 229
 
@@ -242,6 +251,47 @@ consoleintr(int (*getc)(void))
         movecur(-input.o);
       }
       break;
+    case KEY_UP:
+      movecur(input.o);
+      input.o = 0;
+      while(input.e != input.w &&
+            input.buf[(input.e-1) % INPUT_BUF] != '\n'){
+        input.e--;
+        consputc(BACKSPACE);
+      }
+      input_history.selected--;
+      if (input_history.selected < 0) {
+        input_history.selected += MAX_HISTORY_LENGTH;
+      }
+      input_history.selected = input_history.selected % MAX_HISTORY_LENGTH;
+      i = 0;
+      while(input_history.buf[input_history.selected][i] != '\0') {
+        input.buf[input.e % INPUT_BUF] = input_history.buf[input_history.selected][i];
+        input.e++;
+        consputc(input_history.buf[input_history.selected][i]);
+        i++;
+      }
+      break;
+    case KEY_DOWN:
+      if(input_history.next != input_history.selected) {
+        movecur(input.o);
+        input.o = 0;
+        while(input.e != input.w &&
+            input.buf[(input.e-1) % INPUT_BUF] != '\n'){
+          input.e--;
+          consputc(BACKSPACE);
+        }
+        input_history.selected++;
+        input_history.selected = input_history.selected % MAX_HISTORY_LENGTH;
+        i = 0;
+        while(input_history.buf[input_history.selected][i] != '\0') {
+          input.buf[input.e % INPUT_BUF] = input_history.buf[input_history.selected][i];
+          input.e++;
+          consputc(input_history.buf[input_history.selected][i]);
+          i++;
+        }
+      }
+      break;
     case KEY_LEFT:
       if (input.o < input.e - input.w) {
         input.o++;
@@ -259,6 +309,14 @@ consoleintr(int (*getc)(void))
       if(c != 0 && input.e-input.r < INPUT_BUF){
         c = (c == '\r') ? '\n' : c;
         if(c == '\n' || c == C('D') || input.e == input.r+INPUT_BUF){
+          if (input.e != input.w) {
+            for(i = 0; i < (input.e + INPUT_BUF - input.w) % INPUT_BUF; ++i) {
+              input_history.buf[input_history.next][i] = input.buf[(input.w + i) % INPUT_BUF];
+            }
+            input_history.buf[input_history.next][i] = '\0';
+            input_history.next++;
+          }
+          input_history.selected = input_history.next;
           movecur(input.o);
           input.o = 0;
         }

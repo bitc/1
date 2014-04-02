@@ -26,6 +26,32 @@ sys_wait(void)
 }
 
 int
+sys_wait2(void)
+{
+  int *wtime;
+  int *rtime;
+  int *iotime;
+  int result;
+
+  if(argptr(0, (char**)&wtime, sizeof(int)) < 0)
+    return -1;
+
+  if(argptr(1, (char**)&rtime, sizeof(int)) < 0)
+    return -1;
+
+  if(argptr(2, (char**)&iotime, sizeof(int)) < 0)
+    return -1;
+
+  result = wait();
+
+  *wtime = proc->etime - proc->ctime - proc->etime - proc->iotime;
+  *rtime = proc->rtime;
+  *iotime = proc->iotime;
+
+  return result;
+}
+
+int
 sys_kill(void)
 {
   int pid;
